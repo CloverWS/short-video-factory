@@ -81,37 +81,56 @@ const handleRenderVideo = async () => {
   }
 
   try {
-    // 获取文案
+    // 固定视频时长为15秒（仅在没有文案时使用）
+    const FIXED_VIDEO_DURATION = 15
+    
+    // 获取文案（可选）
     appStore.updateRenderStatus(RenderStatus.GenerateText)
-    const text =
-      TextGenerateInstance.value?.getCurrentOutputText() ||
-      (await TextGenerateInstance.value?.handleGenerate())!
+    const text = TextGenerateInstance.value?.getCurrentOutputText() || ''
+    
+    // 如果有文案内容，尝试生成（可能会失败，但不会抛出错误）
+    if (!text && appStore.prompt) {
+      try {
+        await TextGenerateInstance.value?.handleGenerate({ noToast: true })
+      } catch (error) {
+        // 文案生成失败时继续执行，使用空文案
+        console.log('文案生成失败，将使用空文案继续', error)
+      }
+    }
 
-    // TTS合成语音
+    // TTS合成语音（仅在有文案时执行）
+    let videoDuration = FIXED_VIDEO_DURATION
+    let ttsVoicePath: string | undefined = undefined
     // @ts-ignore
     if (appStore.renderStatus !== RenderStatus.GenerateText) {
       return
     }
-    appStore.updateRenderStatus(RenderStatus.SynthesizedSpeech)
-    const ttsResult = await TtsControlInstance.value?.synthesizedSpeechToFile({
-      text,
-      withCaption: true,
-    })
-    if (ttsResult?.duration === undefined) {
-      throw new Error(t('errors.ttsFailedCorrupt'))
-    }
-    if (ttsResult?.duration === 0) {
-      throw new Error(t('errors.ttsZeroDuration'))
+    
+    if (text && text.trim()) {
+      appStore.updateRenderStatus(RenderStatus.SynthesizedSpeech)
+      const ttsResult = await TtsControlInstance.value?.synthesizedSpeechToFile({
+        text,
+        withCaption: true,
+      })
+      if (ttsResult?.duration === undefined) {
+        throw new Error(t('errors.ttsFailedCorrupt'))
+      }
+      if (ttsResult?.duration === 0) {
+        throw new Error(t('errors.ttsZeroDuration'))
+      }
+      // 当有文案时，使用TTS时长而不是固定15秒
+      videoDuration = ttsResult.duration
+      ttsVoicePath = ttsResult.path
     }
 
     // 获取视频片段
     // @ts-ignore
-    if (appStore.renderStatus !== RenderStatus.SynthesizedSpeech) {
+    if (appStore.renderStatus !== RenderStatus.GenerateText && appStore.renderStatus !== RenderStatus.SynthesizedSpeech) {
       return
     }
     appStore.updateRenderStatus(RenderStatus.SegmentVideo)
     const videoSegments = VideoManageInstance.value?.getVideoSegments({
-      duration: ttsResult.duration,
+      duration: videoDuration,
     })!
     await new Promise((resolve) => setTimeout(resolve, random.integer(1000, 3000)))
 
@@ -121,16 +140,24 @@ const handleRenderVideo = async () => {
       return
     }
     appStore.updateRenderStatus(RenderStatus.Rendering)
+    
+    // 构建音频文件配置
+    const audioFilesConfig: { voice?: string; bgm?: string } = {}
+    if (ttsVoicePath) {
+      audioFilesConfig.voice = ttsVoicePath
+    }
+    if (randomBgm?.path) {
+      audioFilesConfig.bgm = randomBgm.path
+    }
+    
     await window.electron.renderVideo({
       ...videoSegments,
-      audioFiles: {
-        bgm: randomBgm?.path,
-      },
+      audioFiles: audioFilesConfig,
       outputSize: {
         width: appStore.renderConfig.outputSize.width,
         height: appStore.renderConfig.outputSize.height,
       },
-      outputDuration: String(ttsResult.duration),
+      outputDuration: String(videoDuration),
       outputPath:
         appStore.renderConfig.outputPath.replace(/\\/g, '/') +
         '/' +

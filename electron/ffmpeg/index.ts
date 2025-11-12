@@ -35,17 +35,20 @@ export async function renderVideo(
 
     // 音频默认配置
     const audioFiles = params.audioFiles ?? {}
-    audioFiles.voice = params.audioFiles?.voice ?? getTempTtsVoiceFilePath()
+    // 只有在传入了voice时才使用，否则不设置默认值
+    // audioFiles.voice = params.audioFiles?.voice ?? getTempTtsVoiceFilePath()
 
-    // 字幕默认配置
+    // 字幕默认配置 - 只有在有voice时才需要字幕
     const subtitleFile =
       params.subtitleFile ??
-      path
-        .join(
-          path.dirname(getTempTtsVoiceFilePath()),
-          path.basename(getTempTtsVoiceFilePath(), '.mp3') + '.srt',
-        )
-        .replace(/\\/g, '/')
+      (audioFiles.voice
+        ? path
+            .join(
+              path.dirname(getTempTtsVoiceFilePath()),
+              path.basename(getTempTtsVoiceFilePath(), '.mp3') + '.srt',
+            )
+            .replace(/\\/g, '/')
+        : undefined)
 
     // 输出路径默认配置
     if (!fs.existsSync(path.dirname(params.outputPath))) {
@@ -62,11 +65,19 @@ export async function renderVideo(
     })
 
     // 添加音频输入
-    // 语音音轨
-    args.push('-i', `${audioFiles.voice}`)
+    // 语音音轨（仅在有voice时添加）
+    let voiceInputIndex = -1
+    if (audioFiles.voice) {
+      voiceInputIndex = videoFiles.length
+      args.push('-i', `${audioFiles.voice}`)
+    }
 
     // 背景音乐
-    audioFiles?.bgm && args.push('-i', `${audioFiles.bgm}`)
+    let bgmInputIndex = -1
+    if (audioFiles?.bgm) {
+      bgmInputIndex = audioFiles.voice ? videoFiles.length + 1 : videoFiles.length
+      args.push('-i', `${audioFiles.bgm}`)
+    }
 
     // 构建复杂滤镜
     const filters = []
@@ -90,25 +101,43 @@ export async function renderVideo(
     // 重置时间基、帧率、色彩空间
     filters.push(`[vconcat]fps=30,format=yuv420p,setpts=PTS-STARTPTS[vout]`)
 
-    // 在视频拼接后添加字幕
-    filters.push(`[vout]subtitles=${subtitleFile.replace(/\:/g, '\\\\:')}[with_subs]`)
+    // 在视频拼接后添加字幕（仅在有字幕文件时）
+    let videoOutputLabel = 'vout'
+    if (subtitleFile && fs.existsSync(subtitleFile)) {
+      filters.push(`[vout]subtitles=${subtitleFile.replace(/\:/g, '\\\\:')}[with_subs]`)
+      videoOutputLabel = 'with_subs'
+    }
 
-    // 音频处理：raw 静音 voice 放大音量，bgm 减小音量
-    filters.push(`[${videoFiles.length}:a]volume=2[voice]`) // voice 音量放大
-    audioFiles?.bgm && filters.push(`[${videoFiles.length + 1}:a]volume=0.5[bgm]`) // bgm 音量缩小
+    // 音频处理：根据是否有voice和bgm来决定如何处理
+    let hasAudio = false
+    
+    if (audioFiles.voice && voiceInputIndex >= 0) {
+      filters.push(`[${voiceInputIndex}:a]volume=2[voice]`) // voice 音量放大
+      hasAudio = true
+    }
+    
+    if (audioFiles.bgm && bgmInputIndex >= 0) {
+      filters.push(`[${bgmInputIndex}:a]volume=0.5[bgm]`) // bgm 音量缩小
+      hasAudio = true
+    }
 
     // 混合音频
-    if (audioFiles?.bgm) {
+    if (audioFiles.voice && audioFiles.bgm) {
       filters.push(`[voice][bgm]amix=inputs=2:duration=longest[aout]`)
-    } else {
+    } else if (audioFiles.voice) {
       filters.push(`[voice]amix=inputs=1:duration=longest[aout]`)
+    } else if (audioFiles.bgm) {
+      filters.push(`[bgm]amix=inputs=1:duration=longest[aout]`)
     }
 
     // 设置 filter_complex
     args.push('-filter_complex', `${filters.join(';')}`)
 
     // 映射输出流
-    args.push('-map', '[with_subs]', '-map', '[aout]')
+    args.push('-map', `[${videoOutputLabel}]`)
+    if (hasAudio) {
+      args.push('-map', '[aout]')
+    }
 
     // 编码参数
     args.push(
@@ -120,10 +149,14 @@ export async function renderVideo(
       '23',
       '-r',
       '30',
-      '-c:a',
-      'aac',
-      '-b:a',
-      '128k',
+    )
+    
+    // 只有在有音频时才添加音频编码参数
+    if (hasAudio) {
+      args.push('-c:a', 'aac', '-b:a', '128k')
+    }
+    
+    args.push(
       '-fps_mode',
       'cfr',
       '-s',
@@ -143,10 +176,10 @@ export async function renderVideo(
     const result = await executeFFmpeg(args, { onProgress, abortSignal })
 
     // 移除临时文件
-    if (fs.existsSync(audioFiles.voice)) {
+    if (audioFiles.voice && fs.existsSync(audioFiles.voice)) {
       fs.unlinkSync(audioFiles.voice)
     }
-    if (fs.existsSync(subtitleFile)) {
+    if (subtitleFile && fs.existsSync(subtitleFile)) {
       fs.unlinkSync(subtitleFile)
     }
 

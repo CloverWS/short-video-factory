@@ -16,4 +16,8 @@ export interface EdgeTtsSynthesizeToFileResult {
    * 合成后的音频时长，单位秒
    */
   duration: number | undefined
+  /**
+   * 合成后的音频文件路径
+   */
+  path: string
 }
