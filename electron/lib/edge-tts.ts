@@ -271,14 +271,14 @@ class SynthesisResultImpl implements SynthesisResult {
         data: {
           start: firstWord.Offset / 10000,
           end: (lastWord.Offset + lastWord.Duration) / 10 ** 4,
-          text: currentSentence.map((sentence) => sentence.text.Text).join(''),
+          text: currentSentence.map((sentence) => sentence.text.Text).join(' '),
         },
       })
     }
 
     this.wordList.forEach((word, index) => {
       const tooLong = () =>
-        currentSentence.map((sentence) => sentence.text.Text).join('').length > 24
+        currentSentence.map((sentence) => sentence.text.Text).join(' ').length > 24
 
       const vocieGap = () =>
         word.Offset - (this.wordList[index - 1].Offset + this.wordList[index - 1].Duration) >

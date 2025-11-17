@@ -29,10 +29,10 @@
 </template>
 
 <script lang="ts" setup>
-import TextGenerate from './components/text-generate.vue'
-import VideoManage from './components/video-manage.vue'
-import TtsControl from './components/tts-control.vue'
-import VideoRender from './components/video-render.vue'
+import TextGenerate from './components/TextGenerate.vue'
+import VideoManage from './components/VideoManage.vue'
+import TtsControl from './components/TtsControl.vue'
+import VideoRender from './components/VideoRender.vue'
 
 import { ref } from 'vue'
 import { RenderStatus, useAppStore } from '@/store'
@@ -66,9 +66,11 @@ const handleRenderVideo = async () => {
   let randomBgm: ListFilesFromFolderRecord | undefined = undefined
   if (appStore.renderConfig.bgmPath) {
     try {
-      const bgmList = await window.electron.listFilesFromFolder({
-        folderPath: appStore.renderConfig.bgmPath.replace(/\\/g, '/'),
-      })
+      const bgmList = (
+        await window.electron.listFilesFromFolder({
+          folderPath: appStore.renderConfig.bgmPath.replace(/\\/g, '/'),
+        })
+      ).filter((asset) => asset.name.endsWith('.mp3'))
       if (bgmList.length > 0) {
         randomBgm = random.choice(bgmList)
       }
@@ -79,11 +81,22 @@ const handleRenderVideo = async () => {
   }
 
   try {
-    // 获取文案
+    // 固定视频时长为15秒（仅在没有文案时使用）
+    const FIXED_VIDEO_DURATION = 15
+    
+    // 获取文案（可选）
     appStore.updateRenderStatus(RenderStatus.GenerateText)
-    const text =
-      TextGenerateInstance.value?.getCurrentOutputText() ||
-      (await TextGenerateInstance.value?.handleGenerate())!
+    const text = TextGenerateInstance.value?.getCurrentOutputText() || ''
+    
+    // 如果有文案内容，尝试生成（可能会失败，但不会抛出错误）
+    if (!text && appStore.prompt) {
+      try {
+        await TextGenerateInstance.value?.handleGenerate({ noToast: true })
+      } catch (error) {
+        // 文案生成失败时继续执行，使用空文案
+        console.log('文案生成失败，将使用空文案继续', error)
+      }
+    }
 
     // 判断是否有文案：有文案则生成TTS并根据TTS时长裁剪视频，无文案则直接拼接视频
     const hasText = text && text.trim().length > 0

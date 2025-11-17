@@ -69,5 +69,6 @@ export async function edgeTtsSynthesizeToFile(
   const metadata = await parseBuffer(result.getBuffer())
   return {
     duration: metadata.format.duration,
+    path: outputPath,
   }
 }
