@@ -150,7 +150,11 @@ onMounted(async () => {
 })
 
 const synthesizedSpeechToFile = async (option: { text: string; withCaption?: boolean }) => {
-  if (!configValid()) throw new Error(t('errors.ttsConfigInvalid'))
+  // 验证配置：只检查voice是否选择
+  if (!appStore.voice) {
+    toast.warning(t('tts.selectVoiceWarning'))
+    throw new Error(t('errors.ttsConfigInvalid'))
+  }
 
   try {
     const result = await window.electron.edgeTtsSynthesizeToFile({

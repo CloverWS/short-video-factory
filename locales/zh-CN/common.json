@@ -94,6 +94,9 @@
   },
   "videoManage": {
     "assetsFolderLabel": "分镜视频素材文件夹",
+    "assetsFirstFolderLabel": "视频开头素材文件夹",
+    "assetsSecondFolderLabel": "视频中间素材文件夹",
+    "assetsThirdFolderLabel": "视频结尾素材文件夹",
     "noMp4InFolder": "选择的文件夹中不包含MP4视频文件",
     "emptyFolder": "选择的文件夹为空",
     "readSuccess": "素材读取成功",

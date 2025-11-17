@@ -10,7 +10,7 @@ import UnoCSS from 'unocss/vite'
 export default defineConfig({
   plugins: [
     vue(),
-    vueDevTools(),
+    // vueDevTools(), // 暂时禁用以避免localStorage错误
     UnoCSS(),
     electron({
       main: {

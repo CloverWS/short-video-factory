@@ -33,7 +33,9 @@ export const useAppStore = defineStore(
     }
 
     // 视频素材管理
-    const videoAssetsFolder = ref('')
+    const videoAssetsFolderFirst = ref('')
+    const videoAssetsFolderSecond = ref('')
+    const videoAssetsFolderThird = ref('')
     const videoExportFolder = ref('')
 
     // 语音合成
@@ -85,7 +87,9 @@ export const useAppStore = defineStore(
       llmConfig,
       updateLLMConfig,
 
-      videoAssetsFolder,
+      videoAssetsFolderFirst,
+      videoAssetsFolderSecond,
+      videoAssetsFolderThird,
       videoExportFolder,
 
       originalVoicesList,

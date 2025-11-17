@@ -94,6 +94,9 @@
   },
   "videoManage": {
     "assetsFolderLabel": "Storyboard assets folder",
+    "assetsFirstFolderLabel": "Video opening assets folder",
+    "assetsSecondFolderLabel": "Video middle assets folder",
+    "assetsThirdFolderLabel": "Video ending assets folder",
     "noMp4InFolder": "No MP4 video files found in the selected folder",
     "emptyFolder": "The selected folder is empty",
     "readSuccess": "Assets loaded successfully",

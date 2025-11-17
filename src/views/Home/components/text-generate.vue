@@ -121,9 +121,9 @@ const outputText = ref('')
 const isGenerating = ref(false)
 const abortController = ref<AbortController | null>(null)
 const handleGenerate = async (oprions?: { noToast?: boolean }) => {
+  // 允许空提示词，如果为空则直接返回空字符串
   if (!appStore.prompt) {
-    !oprions?.noToast && toast.warning(t('errors.promptRequired'))
-    throw new Error(t('errors.promptRequired') as string)
+    return ''
   }
 
   const openai = createOpenAI({

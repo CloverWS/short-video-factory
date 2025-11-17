@@ -36,17 +36,27 @@ export async function renderVideo(
 
     // 音频默认配置
     const audioFiles = params.audioFiles ?? {}
-    audioFiles.voice = params.audioFiles?.voice ?? getTempTtsVoiceFilePath()
+    
+    // 判断是否有语音：null表示明确无语音，undefined表示使用默认路径
+    const hasVoice = audioFiles.voice !== null
+    
+    // 如果有语音且未指定路径，使用默认路径
+    if (hasVoice && (audioFiles.voice === undefined || !audioFiles.voice)) {
+      audioFiles.voice = getTempTtsVoiceFilePath()
+    }
 
-    // 字幕默认配置
-    const subtitleFile =
-      params.subtitleFile ??
-      path
-        .join(
-          path.dirname(getTempTtsVoiceFilePath()),
-          path.basename(getTempTtsVoiceFilePath(), '.mp3') + '.srt',
-        )
-        .replace(/\\/g, '/')
+    // 字幕默认配置 - 只在有语音时才设置字幕
+    let subtitleFile: string | null = null
+    if (hasVoice && params.subtitleFile !== null) {
+      subtitleFile =
+        params.subtitleFile ??
+        path
+          .join(
+            path.dirname(getTempTtsVoiceFilePath()),
+            path.basename(getTempTtsVoiceFilePath(), '.mp3') + '.srt',
+          )
+          .replace(/\\/g, '/')
+    }
 
     // 输出路径默认配置
     if (!fs.existsSync(path.dirname(params.outputPath))) {
@@ -63,11 +73,19 @@ export async function renderVideo(
     })
 
     // 添加音频输入
-    // 语音音轨
-    args.push('-i', `${audioFiles.voice}`)
+    let audioInputIndex = videoFiles.length
+    
+    // 语音音轨（仅在有语音时添加）
+    if (hasVoice) {
+      args.push('-i', `${audioFiles.voice}`)
+      audioInputIndex++
+    }
 
     // 背景音乐
-    audioFiles?.bgm && args.push('-i', `${audioFiles.bgm}`)
+    const hasBgm = audioFiles?.bgm
+    if (hasBgm) {
+      args.push('-i', `${audioFiles.bgm}`)
+    }
 
     // 构建复杂滤镜
     const filters = []
@@ -91,25 +109,50 @@ export async function renderVideo(
     // 重置时间基、帧率、色彩空间
     filters.push(`[vconcat]fps=30,format=yuv420p,setpts=PTS-STARTPTS[vout]`)
 
-    // 在视频拼接后添加字幕
-    filters.push(`[vout]subtitles=${subtitleFile.replace(/\:/g, '\\\\:')}[with_subs]`)
+    // 在视频拼接后添加字幕（仅在有语音和字幕文件时）
+    let finalVideoStream = 'vout'
+    if (hasVoice && subtitleFile && fs.existsSync(subtitleFile)) {
+      filters.push(`[vout]subtitles=${subtitleFile.replace(/\:/g, '\\\\:')}[with_subs]`)
+      finalVideoStream = 'with_subs'
+    }
 
-    // 音频处理：raw 静音 voice 放大音量，bgm 减小音量
-    filters.push(`[${videoFiles.length}:a]volume=2[voice]`) // voice 音量放大
-    audioFiles?.bgm && filters.push(`[${videoFiles.length + 1}:a]volume=0.5[bgm]`) // bgm 音量缩小
+    // 音频处理
+    if (hasVoice || hasBgm) {
+      let voiceIndex = videoFiles.length
+      let bgmIndex = hasVoice ? videoFiles.length + 1 : videoFiles.length
 
-    // 混合音频
-    if (audioFiles?.bgm) {
-      filters.push(`[voice][bgm]amix=inputs=2:duration=longest[aout]`)
-    } else {
-      filters.push(`[voice]amix=inputs=1:duration=longest[aout]`)
+      if (hasVoice) {
+        // voice 音量放大
+        filters.push(`[${voiceIndex}:a]volume=2[voice]`)
+      }
+
+      if (hasBgm) {
+        // bgm 音量缩小
+        filters.push(`[${bgmIndex}:a]volume=0.5[bgm]`)
+      }
+
+      // 混合音频
+      if (hasVoice && hasBgm) {
+        // 有语音和背景音乐：以语音时长为准
+        filters.push(`[voice][bgm]amix=inputs=2:duration=first[aout]`)
+      } else if (hasVoice) {
+        filters.push(`[voice]acopy[aout]`)
+      } else if (hasBgm) {
+        // 只有背景音乐（无语音模式）：直接使用bgm，后面用-shortest裁剪
+        filters.push(`[bgm]acopy[aout]`)
+      }
     }
 
     // 设置 filter_complex
     args.push('-filter_complex', `${filters.join(';')}`)
 
     // 映射输出流
-    args.push('-map', '[with_subs]', '-map', '[aout]')
+    args.push('-map', `[${finalVideoStream}]`)
+    
+    // 只有在有音频时才映射音频流
+    if (hasVoice || hasBgm) {
+      args.push('-map', '[aout]')
+    }
 
     // 编码参数
     args.push(
@@ -121,10 +164,19 @@ export async function renderVideo(
       '23',
       '-r',
       '30',
-      '-c:a',
-      'aac',
-      '-b:a',
-      '128k',
+    )
+    
+    // 只有在有音频时才添加音频编码参数
+    if (hasVoice || hasBgm) {
+      args.push('-c:a', 'aac', '-b:a', '128k')
+      
+      // 如果只有背景音乐（无语音），使用shortest确保以视频长度为准
+      if (!hasVoice && hasBgm) {
+        args.push('-shortest')
+      }
+    }
+    
+    args.push(
       '-fps_mode',
       'cfr',
       '-s',
@@ -144,10 +196,10 @@ export async function renderVideo(
     const result = await executeFFmpeg(args, { onProgress, abortSignal })
 
     // 移除临时文件
-    if (fs.existsSync(audioFiles.voice)) {
+    if (hasVoice && audioFiles.voice && fs.existsSync(audioFiles.voice)) {
       fs.unlinkSync(audioFiles.voice)
     }
-    if (fs.existsSync(subtitleFile)) {
+    if (subtitleFile && fs.existsSync(subtitleFile)) {
       fs.unlinkSync(subtitleFile)
     }
 

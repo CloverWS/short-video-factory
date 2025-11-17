@@ -2,10 +2,11 @@
   <div class="w-full h-full">
     <v-form class="w-full h-full" :disabled="disabled">
       <v-sheet class="h-full p-2 flex flex-col" border rounded>
+        <!-- First Segment Folder -->
         <div class="flex gap-2 mb-2">
           <v-text-field
-            v-model="appStore.videoAssetsFolder"
-            :label="t('videoManage.assetsFolderLabel')"
+            v-model="appStore.videoAssetsFolderFirst"
+            :label="t('videoManage.assetsFirstFolderLabel')"
             density="compact"
             hide-details
             readonly
@@ -15,7 +16,47 @@
             class="mt-[2px]"
             prepend-icon="mdi-folder-open"
             :disabled="disabled"
-            @click="handleSelectFolder"
+            @click="handleSelectFolder('first')"
+          >
+            {{ t('common.select') }}
+          </v-btn>
+        </div>
+
+        <!-- Second Segment Folder -->
+        <div class="flex gap-2 mb-2">
+          <v-text-field
+            v-model="appStore.videoAssetsFolderSecond"
+            :label="t('videoManage.assetsSecondFolderLabel')"
+            density="compact"
+            hide-details
+            readonly
+          >
+          </v-text-field>
+          <v-btn
+            class="mt-[2px]"
+            prepend-icon="mdi-folder-open"
+            :disabled="disabled"
+            @click="handleSelectFolder('second')"
+          >
+            {{ t('common.select') }}
+          </v-btn>
+        </div>
+
+        <!-- Third Segment Folder -->
+        <div class="flex gap-2 mb-2">
+          <v-text-field
+            v-model="appStore.videoAssetsFolderThird"
+            :label="t('videoManage.assetsThirdFolderLabel')"
+            density="compact"
+            hide-details
+            readonly
+          >
+          </v-text-field>
+          <v-btn
+            class="mt-[2px]"
+            prepend-icon="mdi-folder-open"
+            :disabled="disabled"
+            @click="handleSelectFolder('third')"
           >
             {{ t('common.select') }}
           </v-btn>
@@ -23,19 +64,19 @@
 
         <div class="flex-1 h-0 w-full border">
           <div
-            v-if="videoAssets.length"
+            v-if="allVideoAssets.length"
             class="w-full max-h-full overflow-y-auto grid grid-cols-3 gap-2 p-2"
           >
             <div
               class="w-full h-full max-h-[200px]"
-              v-for="(item, index) in videoAssets"
+              v-for="(item, index) in allVideoAssets"
               :key="index"
             >
               <VideoAutoPreview
                 :asset="item"
                 @loaded="
                   (info) => {
-                    videoInfoList[index] = info
+                    handleVideoLoaded(index, info)
                   }
                 "
               />
@@ -52,7 +93,7 @@
           <v-btn
             block
             prepend-icon="mdi-refresh"
-            :disabled="disabled || !appStore.videoAssetsFolder"
+            :disabled="disabled || (!appStore.videoAssetsFolderFirst && !appStore.videoAssetsFolderSecond && !appStore.videoAssetsFolderThird)"
             :loading="refreshAssetsLoading"
             @click="refreshAssets"
           >
@@ -83,38 +124,94 @@ defineProps<{
 }>()
 
 // 选择文件夹
-const handleSelectFolder = async () => {
+const handleSelectFolder = async (segment: 'first' | 'second' | 'third') => {
+  let defaultPath = ''
+  if (segment === 'first') {
+    defaultPath = appStore.videoAssetsFolderFirst
+  } else if (segment === 'second') {
+    defaultPath = appStore.videoAssetsFolderSecond
+  } else {
+    defaultPath = appStore.videoAssetsFolderThird
+  }
+
   const folderPath = await window.electron.selectFolder({
     title: t('dialogs.selectAssetsFolderTitle'),
-    defaultPath: appStore.videoAssetsFolder,
+    defaultPath,
   })
-  console.log('用户选择分镜素材文件夹，绝对路径：', folderPath)
+  console.log(`用户选择分镜素材文件夹（${segment}），绝对路径：`, folderPath)
   if (folderPath) {
-    appStore.videoAssetsFolder = folderPath
+    if (segment === 'first') {
+      appStore.videoAssetsFolderFirst = folderPath
+    } else if (segment === 'second') {
+      appStore.videoAssetsFolderSecond = folderPath
+    } else {
+      appStore.videoAssetsFolderThird = folderPath
+    }
     refreshAssets()
   }
 }
 
 // 刷新素材库
-const videoAssets = ref<ListFilesFromFolderRecord[]>([])
+const videoAssetsFirst = ref<ListFilesFromFolderRecord[]>([])
+const videoAssetsSecond = ref<ListFilesFromFolderRecord[]>([])
+const videoAssetsThird = ref<ListFilesFromFolderRecord[]>([])
+const allVideoAssets = ref<ListFilesFromFolderRecord[]>([])
+
+// 获取视频分镜随机素材片段 - 先声明这些变量
+const videoInfoListFirst = ref<VideoInfo[]>([])
+const videoInfoListSecond = ref<VideoInfo[]>([])
+const videoInfoListThird = ref<VideoInfo[]>([])
+
 const refreshAssetsLoading = ref(false)
 const refreshAssets = async () => {
-  if (!appStore.videoAssetsFolder) {
-    return
-  }
   refreshAssetsLoading.value = true
   try {
-    const assets = await window.electron.listFilesFromFolder({
-      folderPath: appStore.videoAssetsFolder,
-    })
-    console.log(`素材库刷新:`, assets)
-    videoAssets.value = assets.filter((asset) => asset.name.endsWith('.mp4'))
-    if (!videoAssets.value.length) {
-      if (assets.length) {
-        toast.warning(t('videoManage.noMp4InFolder'))
-      } else {
-        toast.warning(t('videoManage.emptyFolder'))
-      }
+    // 清空所有素材
+    videoAssetsFirst.value = []
+    videoAssetsSecond.value = []
+    videoAssetsThird.value = []
+    allVideoAssets.value = []
+    videoInfoListFirst.value = []
+    videoInfoListSecond.value = []
+    videoInfoListThird.value = []
+
+    // 读取第一段素材
+    if (appStore.videoAssetsFolderFirst) {
+      const assetsFirst = await window.electron.listFilesFromFolder({
+        folderPath: appStore.videoAssetsFolderFirst,
+      })
+      videoAssetsFirst.value = assetsFirst.filter((asset) => asset.name.endsWith('.mp4'))
+    }
+
+    // 读取第二段素材
+    if (appStore.videoAssetsFolderSecond) {
+      const assetsSecond = await window.electron.listFilesFromFolder({
+        folderPath: appStore.videoAssetsFolderSecond,
+      })
+      videoAssetsSecond.value = assetsSecond.filter((asset) => asset.name.endsWith('.mp4'))
+    }
+
+    // 读取第三段素材
+    if (appStore.videoAssetsFolderThird) {
+      const assetsThird = await window.electron.listFilesFromFolder({
+        folderPath: appStore.videoAssetsFolderThird,
+      })
+      videoAssetsThird.value = assetsThird.filter((asset) => asset.name.endsWith('.mp4'))
+    }
+
+    // 合并所有素材用于显示
+    allVideoAssets.value = [
+      ...videoAssetsFirst.value,
+      ...videoAssetsSecond.value,
+      ...videoAssetsThird.value,
+    ]
+
+    if (
+      !videoAssetsFirst.value.length &&
+      !videoAssetsSecond.value.length &&
+      !videoAssetsThird.value.length
+    ) {
+      toast.warning(t('videoManage.noMp4InFolder'))
     } else {
       toast.success(t('videoManage.readSuccess'))
     }
@@ -127,14 +224,21 @@ const refreshAssets = async () => {
 }
 refreshAssets()
 
-// 获取视频分镜随机素材片段
-const videoInfoList = ref<VideoInfo[]>([])
-const getVideoSegments = (options: { duration: number }) => {
-  // 判断素材库是否满足时长要求
-  if (videoInfoList.value.reduce((pre, cur) => pre + cur.duration, 0) < options.duration) {
-    throw new Error(t('errors.assetsDurationInsufficient'))
-  }
+// 处理视频加载完成事件，将视频信息存入对应的列表
+const handleVideoLoaded = (index: number, info: VideoInfo) => {
+  const firstCount = videoAssetsFirst.value.length
+  const secondCount = videoAssetsSecond.value.length
 
+  if (index < firstCount) {
+    videoInfoListFirst.value[index] = info
+  } else if (index < firstCount + secondCount) {
+    videoInfoListSecond.value[index - firstCount] = info
+  } else {
+    videoInfoListThird.value[index - firstCount - secondCount] = info
+  }
+}
+
+const getVideoSegments = (options: { duration: number }) => {
   // 搜集随机素材片段
   const segments: Pick<RenderVideoParams, 'videoFiles' | 'timeRanges'> = {
     videoFiles: [],
@@ -142,77 +246,207 @@ const getVideoSegments = (options: { duration: number }) => {
   }
   const minSegmentDuration = 2
   const maxSegmentDuration = 15
-
-  let currentTotalDuration = 0
-  let tempVideoAssets = structuredClone(toRaw(videoAssets.value))
   const trunc3 = (n: number) => ((n * 1e3) << 0) / 1e3
-  while (currentTotalDuration < options.duration) {
-    // 如果素材库中没有剩余素材，时长还不够，重新来一轮
-    if (tempVideoAssets.length === 0) {
-      tempVideoAssets = structuredClone(toRaw(videoAssets.value))
-      continue
+
+  // 将总时长分为三段：开头、中间、结尾
+  // 开头和结尾各占 20%，中间占 60%
+  const firstSegmentDuration = options.duration * 0.2
+  const secondSegmentDuration = options.duration * 0.6
+  const thirdSegmentDuration = options.duration * 0.2
+
+  // 辅助函数：从指定素材池中选择片段
+  const selectSegmentsFromPool = (
+    targetDuration: number,
+    assetPool: ListFilesFromFolderRecord[],
+    infoPool: VideoInfo[],
+    allowRepeat = false, // 是否允许重复使用素材
+  ) => {
+    if (assetPool.length === 0 || targetDuration === 0) {
+      return { videoFiles: [], timeRanges: [] }
     }
 
-    // 获取一个随机素材以及相关信息
-    const randomAsset = random.choice(tempVideoAssets)!
-    const randomAssetIndex = videoAssets.value.findIndex((asset) => asset.path === randomAsset.path)
-    const randomAssetInfo = videoInfoList.value[randomAssetIndex]
-
-    // 删除已选素材
-    tempVideoAssets.splice(randomAssetIndex, 1)
-
-    // 如果素材时长小于最小片段时长，直接添加
-    if (randomAssetInfo.duration < minSegmentDuration) {
-      segments.videoFiles.push(randomAsset.path)
-      segments.timeRanges.push([String(0), String(randomAssetInfo.duration)])
-      currentTotalDuration = trunc3(currentTotalDuration + randomAssetInfo.duration)
-      continue
+    // 如果不允许重复，检查素材池是否有足够时长
+    if (!allowRepeat && infoPool.reduce((pre, cur) => pre + cur.duration, 0) < targetDuration) {
+      throw new Error(t('errors.assetsDurationInsufficient'))
     }
 
-    // 如果素材时长大于最小片段时长，随机一个片段
-    let randomSegmentDuration = random.float(
-      minSegmentDuration,
-      Math.min(maxSegmentDuration, randomAssetInfo.duration),
-    )
-
-    // 处理最后一个片段时长超出规划时长情况
-    if (currentTotalDuration + randomSegmentDuration > options.duration) {
-      randomSegmentDuration = options.duration - currentTotalDuration
+    const result: Pick<RenderVideoParams, 'videoFiles' | 'timeRanges'> = {
+      videoFiles: [],
+      timeRanges: [],
     }
 
-    // 处理最后一个片段时长小于最小片段时长情况
-    if (options.duration - currentTotalDuration - randomSegmentDuration < minSegmentDuration) {
-      if (options.duration - currentTotalDuration < randomAssetInfo.duration) {
-        randomSegmentDuration = options.duration - currentTotalDuration
+    let currentTotalDuration = 0
+    let tempAssets = structuredClone(toRaw(assetPool))
+
+    while (currentTotalDuration < targetDuration) {
+      // 如果素材库中没有剩余素材，时长还不够，重新来一轮
+      if (tempAssets.length === 0) {
+        tempAssets = structuredClone(toRaw(assetPool))
+        continue
       }
+
+      // 获取一个随机素材以及相关信息
+      const randomAsset = random.choice(tempAssets)!
+      const randomAssetIndex = assetPool.findIndex((asset) => asset.path === randomAsset.path)
+      const randomAssetInfo = infoPool[randomAssetIndex]
+
+      // 删除已选素材
+      const tempIndex = tempAssets.findIndex((asset) => asset.path === randomAsset.path)
+      tempAssets.splice(tempIndex, 1)
+
+      // 如果素材时长小于最小片段时长，直接添加
+      if (randomAssetInfo.duration < minSegmentDuration) {
+        result.videoFiles.push(randomAsset.path)
+        result.timeRanges.push([String(0), String(randomAssetInfo.duration)])
+        currentTotalDuration = trunc3(currentTotalDuration + randomAssetInfo.duration)
+        continue
+      }
+
+      // 如果素材时长大于最小片段时长，随机一个片段
+      let randomSegmentDuration = random.float(
+        minSegmentDuration,
+        Math.min(maxSegmentDuration, randomAssetInfo.duration),
+      )
+
+      // 计算剩余需要的时长
+      const remainingDuration = targetDuration - currentTotalDuration
+
+      // 处理最后一个片段的情况
+      if (remainingDuration <= randomSegmentDuration) {
+        // 如果剩余时长小于最小片段时长，则使用整个素材或剩余时长（取较小者）
+        randomSegmentDuration = Math.min(remainingDuration, randomAssetInfo.duration)
+      } else if (remainingDuration < minSegmentDuration + randomSegmentDuration) {
+        // 如果添加这个片段后，剩余时长不足最小片段时长，则调整当前片段时长
+        randomSegmentDuration = Math.min(
+          remainingDuration,
+          randomAssetInfo.duration,
+          maxSegmentDuration,
+        )
+      }
+
+      // 确保片段时长不为0且不超过素材时长
+      randomSegmentDuration = Math.max(0.1, Math.min(randomSegmentDuration, randomAssetInfo.duration))
+
+      let randomSegmentStart = random.float(0, Math.max(0, randomAssetInfo.duration - randomSegmentDuration))
+
+      result.videoFiles.push(randomAsset.path)
+      result.timeRanges.push([
+        String(trunc3(randomSegmentStart)),
+        String(trunc3(randomSegmentStart + randomSegmentDuration)),
+      ])
+      currentTotalDuration = trunc3(currentTotalDuration + randomSegmentDuration)
+
+      console.table([
+        {
+          素材名称: randomAsset.name,
+          素材时长: randomAssetInfo.duration,
+          片段开始: trunc3(randomSegmentStart),
+          片段时长: trunc3(randomSegmentDuration),
+        },
+      ])
     }
 
-    let randomSegmentStart = random.float(0, randomAssetInfo.duration - randomSegmentDuration)
-
-    segments.videoFiles.push(randomAsset.path)
-    segments.timeRanges.push([
-      String(trunc3(randomSegmentStart)),
-      String(trunc3(randomSegmentStart + randomSegmentDuration)),
-    ])
-    currentTotalDuration = trunc3(currentTotalDuration + randomSegmentDuration)
-
-    console.table([
-      {
-        素材名称: randomAsset.name,
-        素材时长: randomAssetInfo.duration,
-        片段开始: trunc3(randomSegmentStart),
-        片段时长: trunc3(randomSegmentDuration),
-      },
-    ])
+    return result
   }
 
-  console.log('随机素材片段总时长:', currentTotalDuration)
+  // 从第一段素材池选择
+  if (videoAssetsFirst.value.length > 0) {
+    const firstSegments = selectSegmentsFromPool(
+      firstSegmentDuration,
+      videoAssetsFirst.value,
+      videoInfoListFirst.value,
+    )
+    segments.videoFiles.push(...firstSegments.videoFiles)
+    segments.timeRanges.push(...firstSegments.timeRanges)
+  }
+
+  // 从第二段素材池选择
+  if (videoAssetsSecond.value.length > 0) {
+    const secondSegments = selectSegmentsFromPool(
+      secondSegmentDuration,
+      videoAssetsSecond.value,
+      videoInfoListSecond.value,
+    )
+    segments.videoFiles.push(...secondSegments.videoFiles)
+    segments.timeRanges.push(...secondSegments.timeRanges)
+  }
+
+  // 从第三段素材池选择（允许重复使用素材以填满时长）
+  if (videoAssetsThird.value.length > 0) {
+    const thirdSegments = selectSegmentsFromPool(
+      thirdSegmentDuration,
+      videoAssetsThird.value,
+      videoInfoListThird.value,
+      true, // 允许重复使用第三段素材
+    )
+    segments.videoFiles.push(...thirdSegments.videoFiles)
+    segments.timeRanges.push(...thirdSegments.timeRanges)
+  }
+
   console.log('随机素材片段汇总:', segments)
 
   return segments
 }
 
-defineExpose({ getVideoSegments })
+// 获取视频片段（无时长限制版本 - 用于无文案模式）
+const getVideoSegmentsWithoutDuration = () => {
+  const segments: Pick<RenderVideoParams, 'videoFiles' | 'timeRanges'> = {
+    videoFiles: [],
+    timeRanges: [],
+  }
+
+  // 辅助函数：从指定素材池中选择一个完整视频
+  const selectOneCompleteVideo = (
+    assetPool: ListFilesFromFolderRecord[],
+    infoPool: VideoInfo[],
+  ) => {
+    if (assetPool.length === 0) {
+      return { videoFile: null, timeRange: null }
+    }
+
+    const randomAsset = random.choice(assetPool)!
+    const randomAssetIndex = assetPool.findIndex((asset) => asset.path === randomAsset.path)
+    const randomAssetInfo = infoPool[randomAssetIndex]
+
+    return {
+      videoFile: randomAsset.path,
+      timeRange: [String(0), String(randomAssetInfo.duration)] as [string, string],
+    }
+  }
+
+  // 从第一段素材池选择一个完整视频
+  if (videoAssetsFirst.value.length > 0) {
+    const first = selectOneCompleteVideo(videoAssetsFirst.value, videoInfoListFirst.value)
+    if (first.videoFile && first.timeRange) {
+      segments.videoFiles.push(first.videoFile)
+      segments.timeRanges.push(first.timeRange)
+    }
+  }
+
+  // 从第二段素材池选择一个完整视频
+  if (videoAssetsSecond.value.length > 0) {
+    const second = selectOneCompleteVideo(videoAssetsSecond.value, videoInfoListSecond.value)
+    if (second.videoFile && second.timeRange) {
+      segments.videoFiles.push(second.videoFile)
+      segments.timeRanges.push(second.timeRange)
+    }
+  }
+
+  // 从第三段素材池选择一个完整视频
+  if (videoAssetsThird.value.length > 0) {
+    const third = selectOneCompleteVideo(videoAssetsThird.value, videoInfoListThird.value)
+    if (third.videoFile && third.timeRange) {
+      segments.videoFiles.push(third.videoFile)
+      segments.timeRanges.push(third.timeRange)
+    }
+  }
+
+  console.log('无时长限制模式 - 随机素材片段汇总:', segments)
+
+  return segments
+}
+
+defineExpose({ getVideoSegments, getVideoSegmentsWithoutDuration })
 </script>
 
 <style lang="scss" scoped>

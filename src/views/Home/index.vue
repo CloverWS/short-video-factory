@@ -85,32 +85,53 @@ const handleRenderVideo = async () => {
       TextGenerateInstance.value?.getCurrentOutputText() ||
       (await TextGenerateInstance.value?.handleGenerate())!
 
-    // TTS合成语音
-    // @ts-ignore
-    if (appStore.renderStatus !== RenderStatus.GenerateText) {
-      return
-    }
-    appStore.updateRenderStatus(RenderStatus.SynthesizedSpeech)
-    const ttsResult = await TtsControlInstance.value?.synthesizedSpeechToFile({
-      text,
-      withCaption: true,
-    })
-    if (ttsResult?.duration === undefined) {
-      throw new Error(t('errors.ttsFailedCorrupt'))
-    }
-    if (ttsResult?.duration === 0) {
-      throw new Error(t('errors.ttsZeroDuration'))
+    // 判断是否有文案：有文案则生成TTS并根据TTS时长裁剪视频，无文案则直接拼接视频
+    const hasText = text && text.trim().length > 0
+
+    let ttsResult: { duration: number } | undefined
+    let videoSegments: any
+
+    if (hasText) {
+      // 模式1：有文案 - 生成TTS语音，根据语音时长选择视频片段
+      // @ts-ignore
+      if (appStore.renderStatus !== RenderStatus.GenerateText) {
+        return
+      }
+      appStore.updateRenderStatus(RenderStatus.SynthesizedSpeech)
+      console.log('开始TTS语音合成，文本长度:', text.length)
+      try {
+        ttsResult = await TtsControlInstance.value?.synthesizedSpeechToFile({
+          text,
+          withCaption: true,
+        })
+        console.log('TTS合成完成，结果:', ttsResult)
+      } catch (error) {
+        console.error('TTS合成失败:', error)
+        throw error
+      }
+      
+      if (ttsResult?.duration === undefined) {
+        throw new Error(t('errors.ttsFailedCorrupt'))
+      }
+      if (ttsResult?.duration === 0) {
+        throw new Error(t('errors.ttsZeroDuration'))
+      }
+
+      // 获取视频片段（根据TTS时长）
+      // @ts-ignore
+      if (appStore.renderStatus !== RenderStatus.SynthesizedSpeech) {
+        return
+      }
+      appStore.updateRenderStatus(RenderStatus.SegmentVideo)
+      videoSegments = VideoManageInstance.value?.getVideoSegments({
+        duration: ttsResult.duration,
+      })!
+    } else {
+      // 模式2：无文案 - 直接拼接视频，不限制时长
+      appStore.updateRenderStatus(RenderStatus.SegmentVideo)
+      videoSegments = VideoManageInstance.value?.getVideoSegmentsWithoutDuration()!
     }
 
-    // 获取视频片段
-    // @ts-ignore
-    if (appStore.renderStatus !== RenderStatus.SynthesizedSpeech) {
-      return
-    }
-    appStore.updateRenderStatus(RenderStatus.SegmentVideo)
-    const videoSegments = VideoManageInstance.value?.getVideoSegments({
-      duration: ttsResult.duration,
-    })!
     await new Promise((resolve) => setTimeout(resolve, random.integer(1000, 3000)))
 
     // 合成视频
@@ -119,22 +140,43 @@ const handleRenderVideo = async () => {
       return
     }
     appStore.updateRenderStatus(RenderStatus.Rendering)
-    await window.electron.renderVideo({
+
+    // 构建渲染参数
+    const renderParams: any = {
       ...videoSegments,
-      audioFiles: {
-        bgm: randomBgm?.path,
-      },
+      audioFiles: hasText
+        ? {
+            // 有文案时包含语音和背景音乐（voice使用默认路径）
+            voice: undefined, // 使用默认路径getTempTtsVoiceFilePath()
+            bgm: randomBgm?.path,
+          }
+        : {
+            // 无文案时只有背景音乐
+            voice: null, // 明确设置为null表示无语音
+            bgm: randomBgm?.path,
+          },
       outputSize: {
         width: appStore.renderConfig.outputSize.width,
         height: appStore.renderConfig.outputSize.height,
       },
-      outputDuration: String(ttsResult.duration),
       outputPath:
         appStore.renderConfig.outputPath.replace(/\\/g, '/') +
         '/' +
         appStore.renderConfig.outputFileName +
         appStore.renderConfig.outputFileExt,
-    })
+    }
+
+    // 有TTS时设置输出时长和字幕文件（使用默认路径）
+    if (hasText && ttsResult) {
+      renderParams.outputDuration = String(ttsResult.duration)
+      // subtitleFile 使用默认路径，不需要特别设置
+      renderParams.subtitleFile = undefined
+    } else {
+      // 无TTS时不设置字幕文件
+      renderParams.subtitleFile = null
+    }
+
+    await window.electron.renderVideo(renderParams)
 
     toast.success(t('success.renderSuccess'))
     appStore.updateRenderStatus(RenderStatus.Completed)
