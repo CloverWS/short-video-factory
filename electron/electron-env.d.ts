@@ -57,4 +57,24 @@ interface Window {
     delete: (param: import('./sqlite/types').DeleteParams) => Promise<void>
     bulkInsertOrUpdate: (param: import('./sqlite/types').BulkInsertOrUpdateParams) => Promise<void>
   }
+  combination: {
+    /** 检查组合是否可用（不违反去重规则） */
+    check: (
+      params: import('./combination/types').CheckCombinationParams,
+    ) => Promise<import('./combination/types').CheckCombinationResult>
+    /** 记录已使用的组合 */
+    record: (params: import('./combination/types').RecordCombinationParams) => Promise<void>
+    /** 获取下一个可用组合 */
+    getNext: (
+      params: import('./combination/types').GetNextCombinationParams,
+    ) => Promise<import('./combination/types').GetNextCombinationResult>
+    /** 获取组合统计信息 */
+    getStats: () => Promise<import('./combination/types').CombinationStatsResult>
+    /** 清除所有组合记录 */
+    clear: () => Promise<void>
+    /** 重置遍历索引 */
+    resetIndex: () => Promise<void>
+    /** 获取当前遍历索引 */
+    getIndex: () => Promise<number>
+  }
 }

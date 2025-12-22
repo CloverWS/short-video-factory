@@ -389,64 +389,118 @@ const getVideoSegments = (options: { duration: number }) => {
 }
 
 // 获取视频片段（无时长限制版本 - 用于无文案模式）
-const getVideoSegmentsWithoutDuration = () => {
+// 改为按顺序遍历所有组合，并应用去重规则
+const getVideoSegmentsWithoutDuration = async () => {
   const segments: Pick<RenderVideoParams, 'videoFiles' | 'timeRanges'> = {
     videoFiles: [],
     timeRanges: [],
   }
 
-  // 辅助函数：从指定素材池中选择一个完整视频
-  const selectOneCompleteVideo = (
-    assetPool: ListFilesFromFolderRecord[],
-    infoPool: VideoInfo[],
-  ) => {
-    if (assetPool.length === 0) {
-      return { videoFile: null, timeRange: null }
-    }
-
-    const randomAsset = random.choice(assetPool)!
-    const randomAssetIndex = assetPool.findIndex((asset) => asset.path === randomAsset.path)
-    const randomAssetInfo = infoPool[randomAssetIndex]
-
-    return {
-      videoFile: randomAsset.path,
-      timeRange: [String(0), String(randomAssetInfo.duration)] as [string, string],
-    }
+  // 检查三个素材池是否都有素材
+  if (
+    videoAssetsFirst.value.length === 0 ||
+    videoAssetsSecond.value.length === 0 ||
+    videoAssetsThird.value.length === 0
+  ) {
+    console.warn('无时长限制模式 - 至少有一个素材池为空，无法生成组合')
+    return segments
   }
 
-  // 从第一段素材池选择一个完整视频
-  if (videoAssetsFirst.value.length > 0) {
-    const first = selectOneCompleteVideo(videoAssetsFirst.value, videoInfoListFirst.value)
-    if (first.videoFile && first.timeRange) {
-      segments.videoFiles.push(first.videoFile)
-      segments.timeRanges.push(first.timeRange)
+  // 获取文件名列表（用于组合管理）
+  const frontAssets = videoAssetsFirst.value.map((asset) => asset.name)
+  const midAssets = videoAssetsSecond.value.map((asset) => asset.name)
+  const endAssets = videoAssetsThird.value.map((asset) => asset.name)
+
+  // 获取下一个可用的组合（按顺序遍历，自动跳过重复的组合）
+  const result = await window.combination.getNext({
+    frontAssets,
+    midAssets,
+    endAssets,
+  })
+
+  console.log('组合查询结果:', result)
+
+  if (!result.found) {
+    if (result.exhausted) {
+      toast.warning(t('videoManage.allCombinationsUsed'))
+      console.warn('无时长限制模式 - 所有组合都已使用完毕')
     }
+    return segments
   }
 
-  // 从第二段素材池选择一个完整视频
-  if (videoAssetsSecond.value.length > 0) {
-    const second = selectOneCompleteVideo(videoAssetsSecond.value, videoInfoListSecond.value)
-    if (second.videoFile && second.timeRange) {
-      segments.videoFiles.push(second.videoFile)
-      segments.timeRanges.push(second.timeRange)
-    }
+  // 根据文件名找到对应的素材信息
+  const frontAsset = videoAssetsFirst.value.find((asset) => asset.name === result.front)
+  const midAsset = videoAssetsSecond.value.find((asset) => asset.name === result.mid)
+  const endAsset = videoAssetsThird.value.find((asset) => asset.name === result.end)
+
+  if (!frontAsset || !midAsset || !endAsset) {
+    console.error('无时长限制模式 - 无法找到对应的素材文件')
+    return segments
   }
 
-  // 从第三段素材池选择一个完整视频
-  if (videoAssetsThird.value.length > 0) {
-    const third = selectOneCompleteVideo(videoAssetsThird.value, videoInfoListThird.value)
-    if (third.videoFile && third.timeRange) {
-      segments.videoFiles.push(third.videoFile)
-      segments.timeRanges.push(third.timeRange)
-    }
-  }
+  // 获取视频时长信息
+  const frontIndex = videoAssetsFirst.value.indexOf(frontAsset)
+  const midIndex = videoAssetsSecond.value.indexOf(midAsset)
+  const endIndex = videoAssetsThird.value.indexOf(endAsset)
 
-  console.log('无时长限制模式 - 随机素材片段汇总:', segments)
+  const frontInfo = videoInfoListFirst.value[frontIndex]
+  const midInfo = videoInfoListSecond.value[midIndex]
+  const endInfo = videoInfoListThird.value[endIndex]
+
+  // 添加三段视频
+  segments.videoFiles.push(frontAsset.path)
+  segments.timeRanges.push([String(0), String(frontInfo?.duration || 0)])
+
+  segments.videoFiles.push(midAsset.path)
+  segments.timeRanges.push([String(0), String(midInfo?.duration || 0)])
+
+  segments.videoFiles.push(endAsset.path)
+  segments.timeRanges.push([String(0), String(endInfo?.duration || 0)])
+
+  // 记录这个组合（用于后续去重）
+  await window.combination.record({
+    front: result.front!,
+    mid: result.mid!,
+    end: result.end!,
+  })
+
+  console.log('无时长限制模式 - 按顺序选择素材片段汇总:', {
+    组合索引: result.currentIndex,
+    总组合数: result.totalCombinations,
+    已使用组合数: result.usedCombinations,
+    前段: result.front,
+    中段: result.mid,
+    后段: result.end,
+    segments,
+  })
 
   return segments
 }
 
-defineExpose({ getVideoSegments, getVideoSegmentsWithoutDuration })
+// 获取组合统计信息
+const getCombinationStats = async () => {
+  return await window.combination.getStats()
+}
+
+// 清除所有组合记录
+const clearCombinationRecords = async () => {
+  await window.combination.clear()
+  toast.success(t('videoManage.combinationRecordsCleared'))
+}
+
+// 重置遍历索引
+const resetCombinationIndex = async () => {
+  await window.combination.resetIndex()
+  toast.success(t('videoManage.combinationIndexReset'))
+}
+
+defineExpose({
+  getVideoSegments,
+  getVideoSegmentsWithoutDuration,
+  getCombinationStats,
+  clearCombinationRecords,
+  resetCombinationIndex,
+})
 </script>
 
 <style lang="scss" scoped>

@@ -102,7 +102,10 @@
     "noMp4InFolder": "No MP4 video files found in the selected folder",
     "emptyFolder": "The selected folder is empty",
     "readSuccess": "Assets loaded successfully",
-    "readFailed": "Failed to read assets. Please check if the folder exists"
+    "readFailed": "Failed to read assets. Please check if the folder exists",
+    "allCombinationsUsed": "All video combinations have been used. Please clear records or add more assets",
+    "combinationRecordsCleared": "Combination records cleared",
+    "combinationIndexReset": "Iteration index reset"
   },
   "tts": {
     "language": "Language",

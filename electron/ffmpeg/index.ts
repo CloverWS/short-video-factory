@@ -31,7 +31,25 @@ export async function renderVideo(
 ): Promise<ExecuteFFmpegResult> {
   try {
     // 解构参数
-    const { videoFiles, timeRanges, outputSize, outputDuration, onProgress, abortSignal } = params
+    const { videoFiles, timeRanges, outputSize, onProgress, abortSignal } = params
+
+    // 检查视频片段是否为空
+    if (!videoFiles || videoFiles.length === 0) {
+      throw new Error('无法渲染视频：没有提供视频片段（videoFiles 为空）')
+    }
+    
+    if (!timeRanges || timeRanges.length !== videoFiles.length) {
+      throw new Error(`无法渲染视频：timeRanges (${timeRanges?.length ?? 0}) 与 videoFiles (${videoFiles.length}) 数量不匹配`)
+    }
+    
+    // 计算视频总时长（从 timeRanges 中计算）
+    let calculatedVideoDuration = 0
+    for (const [start, end] of timeRanges) {
+      calculatedVideoDuration += parseFloat(end) - parseFloat(start)
+    }
+    
+    // 如果传入了 outputDuration，使用传入值；否则使用计算的视频总时长
+    const outputDuration = params.outputDuration ?? String(calculatedVideoDuration)
 
     // 音频默认配置
     const audioFiles = params.audioFiles ?? {}
@@ -137,7 +155,8 @@ export async function renderVideo(
       } else if (hasVoice) {
         filters.push(`[voice]acopy[aout]`)
       } else if (hasBgm) {
-        // 只有背景音乐（无语音模式）：直接使用bgm，后面用-shortest裁剪
+        // 只有背景音乐（无语音模式）：直接使用 BGM
+        // 通过 -t 参数限制输出时长为视频总时长
         filters.push(`[bgm]acopy[aout]`)
       }
     }
@@ -168,11 +187,6 @@ export async function renderVideo(
     // 只有在有音频时才添加音频编码参数
     if (hasVoice || hasBgm) {
       args.push('-c:a', 'aac', '-b:a', '128k')
-      
-      // 如果只有背景音乐（无语音），使用shortest确保以视频长度为准
-      if (!hasVoice && hasBgm) {
-        args.push('-shortest')
-      }
     }
     
     args.push(
@@ -187,9 +201,8 @@ export async function renderVideo(
       outputPath,
     )
 
-    // 打印命令
-    // console.log('传入参数:', params)
-    // console.log('执行命令:', args.join(' '))
+    // 打印简要信息
+    console.log(`[FFmpeg] Rendering video: ${videoFiles.length} clips, duration=${outputDuration}s`)
 
     // 执行命令
     const result = await executeFFmpeg(args, { onProgress, abortSignal })
@@ -241,16 +254,16 @@ export async function executeFFmpeg(
 
     child.stderr.on('data', (data) => {
       stderr += data.toString()
-      // 实时输出进度信息
       options?.onProgress?.(progress >= 100 ? 99 : progress)
     })
 
     child.on('close', (code) => {
       if (code === 0) {
+        console.log('[FFmpeg] Render completed successfully')
         options?.onProgress?.(100)
         resolve({ stdout, stderr, code })
       } else {
-        reject(new Error(`FFmpeg exited with code ${code}: ${stderr}`))
+        reject(new Error(`FFmpeg exited with code ${code}: ${stderr.slice(-500)}`))
       }
     })
 

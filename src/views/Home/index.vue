@@ -81,9 +81,6 @@ const handleRenderVideo = async () => {
   }
 
   try {
-    // 固定视频时长为15秒（仅在没有文案时使用）
-    const FIXED_VIDEO_DURATION = 15
-    
     // 获取文案（可选）
     appStore.updateRenderStatus(RenderStatus.GenerateText)
     const text = TextGenerateInstance.value?.getCurrentOutputText() || ''
@@ -101,7 +98,7 @@ const handleRenderVideo = async () => {
     // 判断是否有文案：有文案则生成TTS并根据TTS时长裁剪视频，无文案则直接拼接视频
     const hasText = text && text.trim().length > 0
 
-    let ttsResult: { duration: number } | undefined
+    let ttsResult: { duration: number | undefined; path: string } | undefined
     let videoSegments: any
 
     if (hasText) {
@@ -141,8 +138,9 @@ const handleRenderVideo = async () => {
       })!
     } else {
       // 模式2：无文案 - 直接拼接视频，不限制时长
+      // 使用按顺序遍历的方式获取视频组合，自动应用去重规则
       appStore.updateRenderStatus(RenderStatus.SegmentVideo)
-      videoSegments = VideoManageInstance.value?.getVideoSegmentsWithoutDuration()!
+      videoSegments = await VideoManageInstance.value?.getVideoSegmentsWithoutDuration()!
     }
 
     await new Promise((resolve) => setTimeout(resolve, random.integer(1000, 3000)))

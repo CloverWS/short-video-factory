@@ -179,10 +179,10 @@ app.on('activate', () => {
 // 禁用硬件加速
 // app.disableHardwareAcceleration();
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   initSqlite()
   initI18n()
-  initIPC()
+  await initIPC()
   createWindow()
 
   i18next.on('languageChanged', () => {

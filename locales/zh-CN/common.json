@@ -102,7 +102,10 @@
     "noMp4InFolder": "选择的文件夹中不包含MP4视频文件",
     "emptyFolder": "选择的文件夹为空",
     "readSuccess": "素材读取成功",
-    "readFailed": "素材读取失败，请检查文件夹是否存在"
+    "readFailed": "素材读取失败，请检查文件夹是否存在",
+    "allCombinationsUsed": "所有视频组合都已使用完毕，请清除记录或添加更多素材",
+    "combinationRecordsCleared": "组合记录已清除",
+    "combinationIndexReset": "遍历索引已重置"
   },
   "tts": {
     "language": "语言",

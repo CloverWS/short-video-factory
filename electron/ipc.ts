@@ -6,6 +6,16 @@ import { sqBulkInsertOrUpdate, sqDelete, sqInsert, sqQuery, sqUpdate } from './s
 import { ListFilesFromFolderParams, OpenExternalParams, SelectFolderParams } from './types'
 import { edgeTtsGetVoiceList, edgeTtsSynthesizeToBase64, edgeTtsSynthesizeToFile } from './tts'
 import { renderVideo } from './ffmpeg'
+import {
+  initCombinationManager,
+  checkCombination,
+  recordCombination,
+  getNextAvailableCombination,
+  getCombinationStats,
+  clearAllCombinations,
+  resetIterationIndex,
+  getCurrentIterationIndex,
+} from './combination'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -20,7 +30,10 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
   ? path.join(process.env.APP_ROOT, 'public')
   : RENDERER_DIST
 
-export default function initIPC() {
+export default async function initIPC() {
+  // 初始化组合管理模块
+  await initCombinationManager()
+
   // sqlite 查询
   ipcMain.handle('sqlite-query', (_event, params) => sqQuery(params))
   // sqlite 插入
@@ -118,4 +131,20 @@ export default function initIPC() {
 
     return renderVideo({ ...params, onProgress, abortSignal: controller.signal })
   })
+
+  // ============ 视频组合管理 ============
+  // 检查组合是否可用
+  ipcMain.handle('combination-check', (_event, params) => checkCombination(params))
+  // 记录已使用的组合
+  ipcMain.handle('combination-record', (_event, params) => recordCombination(params))
+  // 获取下一个可用组合
+  ipcMain.handle('combination-get-next', (_event, params) => getNextAvailableCombination(params))
+  // 获取组合统计信息
+  ipcMain.handle('combination-stats', () => getCombinationStats())
+  // 清除所有组合记录
+  ipcMain.handle('combination-clear', () => clearAllCombinations())
+  // 重置遍历索引
+  ipcMain.handle('combination-reset-index', () => resetIterationIndex())
+  // 获取当前遍历索引
+  ipcMain.handle('combination-get-index', () => getCurrentIterationIndex())
 }

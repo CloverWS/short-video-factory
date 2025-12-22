@@ -9,6 +9,11 @@ import {
 import { ListFilesFromFolderParams, OpenExternalParams, SelectFolderParams } from './types'
 import { EdgeTtsSynthesizeCommonParams } from './tts/types'
 import { RenderVideoParams } from './ffmpeg/types'
+import {
+  CheckCombinationParams,
+  RecordCombinationParams,
+  GetNextCombinationParams,
+} from './combination/types'
 
 // --------- 向界面渲染进程暴露某些API ---------
 
@@ -65,4 +70,22 @@ contextBridge.exposeInMainWorld('sqlite', {
   delete: (params: DeleteParams) => ipcRenderer.invoke('sqlite-delete', params),
   bulkInsertOrUpdate: (params: BulkInsertOrUpdateParams) =>
     ipcRenderer.invoke('sqlite-bulk-insert-or-update', params),
+})
+
+// 视频组合管理 API
+contextBridge.exposeInMainWorld('combination', {
+  /** 检查组合是否可用（不违反去重规则） */
+  check: (params: CheckCombinationParams) => ipcRenderer.invoke('combination-check', params),
+  /** 记录已使用的组合 */
+  record: (params: RecordCombinationParams) => ipcRenderer.invoke('combination-record', params),
+  /** 获取下一个可用组合 */
+  getNext: (params: GetNextCombinationParams) => ipcRenderer.invoke('combination-get-next', params),
+  /** 获取组合统计信息 */
+  getStats: () => ipcRenderer.invoke('combination-stats'),
+  /** 清除所有组合记录 */
+  clear: () => ipcRenderer.invoke('combination-clear'),
+  /** 重置遍历索引 */
+  resetIndex: () => ipcRenderer.invoke('combination-reset-index'),
+  /** 获取当前遍历索引 */
+  getIndex: () => ipcRenderer.invoke('combination-get-index'),
 })
