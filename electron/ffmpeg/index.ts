@@ -42,6 +42,13 @@ export async function renderVideo(
       throw new Error(`无法渲染视频：timeRanges (${timeRanges?.length ?? 0}) 与 videoFiles (${videoFiles.length}) 数量不匹配`)
     }
     
+    // 检查所有视频文件是否存在
+    for (const videoFile of videoFiles) {
+      if (!fs.existsSync(videoFile)) {
+        throw new Error(`视频文件不存在: ${videoFile}`)
+      }
+    }
+    
     // 计算视频总时长（从 timeRanges 中计算）
     let calculatedVideoDuration = 0
     for (const [start, end] of timeRanges) {
@@ -76,8 +83,9 @@ export async function renderVideo(
     }
 
     // 输出路径默认配置
-    if (!fs.existsSync(path.dirname(params.outputPath))) {
-      throw new Error(`输出路径不存在`)
+    const outputDir = path.dirname(params.outputPath)
+    if (!fs.existsSync(outputDir)) {
+      throw new Error(`输出目录不存在: ${outputDir}`)
     }
     const outputPath = generateUniqueFileName(params.outputPath)
 

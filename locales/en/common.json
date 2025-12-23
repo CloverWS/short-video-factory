@@ -43,7 +43,9 @@
     "test": "Test",
     "save": "Save",
     "select": "Select",
-    "noData": "No data"
+    "noData": "No data",
+    "cancel": "Cancel",
+    "confirm": "Confirm"
   },
   "actions": {
     "generate": "Generate",
@@ -55,7 +57,9 @@
     "selectAssetsFolderTitle": "Select storyboard assets folder",
     "selectOutputFolderTitle": "Select video export folder",
     "selectBgmFolderTitle": "Select background music folder",
-    "renderConfigTitle": "Configure render options"
+    "renderConfigTitle": "Configure render options",
+    "confirmTitle": "Confirm Action",
+    "clearDeduplicationConfirm": "Are you sure you want to clear all deduplication history? Previously used video combinations will become available again."
   },
   "errors": {
     "promptRequired": "Prompt cannot be empty",
@@ -70,7 +74,8 @@
     "assetsDurationInsufficient": "Total assets duration is insufficient",
     "edgeTtsListFailed": "Failed to fetch Edge TTS voice list. Please check your network",
     "ttsConfigInvalid": "TTS configuration is invalid",
-    "ttsSynthesisFailed": "TTS synthesis failed"
+    "ttsSynthesisFailed": "TTS synthesis failed",
+    "videoInfoInvalid": "[{{segment}}] Video \"{{name}}\" has invalid duration info. Please check if the file is corrupted or reload assets"
   },
   "success": {
     "renderSuccess": "Video rendered successfully"
@@ -105,7 +110,10 @@
     "readFailed": "Failed to read assets. Please check if the folder exists",
     "allCombinationsUsed": "All video combinations have been used. Please clear records or add more assets",
     "combinationRecordsCleared": "Combination records cleared",
-    "combinationIndexReset": "Iteration index reset"
+    "combinationIndexReset": "Iteration index reset",
+    "segmentFront": "Opening",
+    "segmentMid": "Middle",
+    "segmentEnd": "Ending"
   },
   "tts": {
     "language": "Language",
@@ -138,6 +146,7 @@
     "startRender": "Start Rendering",
     "stopRender": "Stop Rendering",
     "autoBatch": "Auto batch render",
+    "clearDeduplication": "Clear Deduplication History",
     "bgmFolderLabel": "Background music folder (.mp3, pick randomly)",
     "output": {
       "width": "Output width",

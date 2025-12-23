@@ -447,15 +447,29 @@ const getVideoSegmentsWithoutDuration = async () => {
   const midInfo = videoInfoListSecond.value[midIndex]
   const endInfo = videoInfoListThird.value[endIndex]
 
+  // 验证所有视频信息都有效（时长大于0）
+  if (!frontInfo?.duration || frontInfo.duration <= 0) {
+    console.error(`无时长限制模式 - 前段视频 "${result.front}" 时长信息无效 (duration=${frontInfo?.duration})`)
+    throw new Error(t('errors.videoInfoInvalid', { segment: t('videoManage.segmentFront'), name: result.front }))
+  }
+  if (!midInfo?.duration || midInfo.duration <= 0) {
+    console.error(`无时长限制模式 - 中段视频 "${result.mid}" 时长信息无效 (duration=${midInfo?.duration})`)
+    throw new Error(t('errors.videoInfoInvalid', { segment: t('videoManage.segmentMid'), name: result.mid }))
+  }
+  if (!endInfo?.duration || endInfo.duration <= 0) {
+    console.error(`无时长限制模式 - 后段视频 "${result.end}" 时长信息无效 (duration=${endInfo?.duration})`)
+    throw new Error(t('errors.videoInfoInvalid', { segment: t('videoManage.segmentEnd'), name: result.end }))
+  }
+
   // 添加三段视频
   segments.videoFiles.push(frontAsset.path)
-  segments.timeRanges.push([String(0), String(frontInfo?.duration || 0)])
+  segments.timeRanges.push([String(0), String(frontInfo.duration)])
 
   segments.videoFiles.push(midAsset.path)
-  segments.timeRanges.push([String(0), String(midInfo?.duration || 0)])
+  segments.timeRanges.push([String(0), String(midInfo.duration)])
 
   segments.videoFiles.push(endAsset.path)
-  segments.timeRanges.push([String(0), String(endInfo?.duration || 0)])
+  segments.timeRanges.push([String(0), String(endInfo.duration)])
 
   // 记录这个组合（用于后续去重）
   await window.combination.record({

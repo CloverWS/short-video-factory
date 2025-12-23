@@ -148,6 +148,38 @@
               </v-card-actions>
             </v-card>
           </v-dialog>
+
+          <!-- 清除历史去重信息按钮 -->
+          <v-dialog v-model="clearConfirmDialogShow" max-width="400" persistent>
+            <template v-slot:activator="{ props: activatorProps }">
+              <v-btn
+                v-bind="activatorProps"
+                :disabled="taskInProgress"
+                prepend-icon="mdi-delete-sweep"
+                variant="outlined"
+                color="warning"
+              >
+                {{ t('render.clearDeduplication') }}
+              </v-btn>
+            </template>
+
+            <v-card prepend-icon="mdi-alert" :title="t('dialogs.confirmTitle')">
+              <v-card-text>
+                {{ t('dialogs.clearDeduplicationConfirm') }}
+              </v-card-text>
+              <v-divider></v-divider>
+              <v-card-actions>
+                <v-spacer></v-spacer>
+                <v-btn :text="t('common.cancel')" variant="plain" @click="clearConfirmDialogShow = false"></v-btn>
+                <v-btn
+                  color="warning"
+                  :text="t('common.confirm')"
+                  variant="tonal"
+                  @click="handleClearDeduplication"
+                ></v-btn>
+              </v-card-actions>
+            </v-card>
+          </v-dialog>
         </div>
       </div>
 
@@ -174,10 +206,12 @@
 <script lang="ts" setup>
 import { ref, toRaw, nextTick, computed } from 'vue'
 import { useTranslation } from 'i18next-vue'
+import { useToast } from 'vue-toastification'
 import { RenderStatus, useAppStore } from '@/store'
 
 const appStore = useAppStore()
 const { t } = useTranslation()
+const toast = useToast()
 
 const emit = defineEmits<{
   (e: 'renderVideo'): void
@@ -236,6 +270,14 @@ const handleSelectBgmFolder = async () => {
 
 const handleOpenHomePage = () => {
   window.electron.openExternal({ url: 'https://yils.blog/?ref=short-video-factory' })
+}
+
+// 清除历史去重信息
+const clearConfirmDialogShow = ref(false)
+const handleClearDeduplication = async () => {
+  await window.combination.clear()
+  clearConfirmDialogShow.value = false
+  toast.success(t('videoManage.combinationRecordsCleared'))
 }
 </script>
 

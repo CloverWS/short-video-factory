@@ -95,12 +95,25 @@ export default async function initIPC() {
 
   // 读取文件夹内所有文件
   ipcMain.handle('list-files-from-folder', async (_event, params: ListFilesFromFolderParams) => {
-    const files = await fs.promises.readdir(params.folderPath, { withFileTypes: true })
+    const folderPath = params.folderPath
+    
+    // 检查路径是否存在
+    if (!fs.existsSync(folderPath)) {
+      throw new Error(`文件夹不存在: ${folderPath}`)
+    }
+    
+    // 检查是否为目录
+    const stat = await fs.promises.stat(folderPath)
+    if (!stat.isDirectory()) {
+      throw new Error(`路径不是文件夹: ${folderPath}`)
+    }
+    
+    const files = await fs.promises.readdir(folderPath, { withFileTypes: true })
     return files
       .filter((file) => file.isFile())
       .map((file) => ({
         name: file.name,
-        path: path.join(params.folderPath, file.name).replace(/\\/g, '/'),
+        path: path.join(folderPath, file.name).replace(/\\/g, '/'),
       }))
   })
 

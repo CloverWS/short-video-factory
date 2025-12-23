@@ -43,7 +43,9 @@
     "test": "测试",
     "save": "保存",
     "select": "选择",
-    "noData": "无数据"
+    "noData": "无数据",
+    "cancel": "取消",
+    "confirm": "确认"
   },
   "actions": {
     "generate": "生成",
@@ -55,7 +57,9 @@
     "selectAssetsFolderTitle": "选择分镜素材文件夹",
     "selectOutputFolderTitle": "选择视频导出文件夹",
     "selectBgmFolderTitle": "选择背景音乐文件夹",
-    "renderConfigTitle": "配置合成选项"
+    "renderConfigTitle": "配置合成选项",
+    "confirmTitle": "确认操作",
+    "clearDeduplicationConfirm": "确定要清除所有历史去重信息吗？清除后，之前使用过的视频组合将可以重新使用。"
   },
   "errors": {
     "promptRequired": "提示词不能为空",
@@ -70,7 +74,8 @@
     "assetsDurationInsufficient": "素材总时长不足",
     "edgeTtsListFailed": "获取EdgeTTS语音列表失败，请检查网络",
     "ttsConfigInvalid": "TTS语音合成配置无效",
-    "ttsSynthesisFailed": "语音合成失败"
+    "ttsSynthesisFailed": "语音合成失败",
+    "videoInfoInvalid": "【{{segment}}】视频 \"{{name}}\" 时长信息无效，请检查素材文件是否损坏或重新加载素材"
   },
   "success": {
     "renderSuccess": "视频合成成功"
@@ -105,7 +110,10 @@
     "readFailed": "素材读取失败，请检查文件夹是否存在",
     "allCombinationsUsed": "所有视频组合都已使用完毕，请清除记录或添加更多素材",
     "combinationRecordsCleared": "组合记录已清除",
-    "combinationIndexReset": "遍历索引已重置"
+    "combinationIndexReset": "遍历索引已重置",
+    "segmentFront": "开头素材",
+    "segmentMid": "中间素材",
+    "segmentEnd": "结尾素材"
   },
   "tts": {
     "language": "语言",
@@ -138,6 +146,7 @@
     "startRender": "开始合成",
     "stopRender": "停止合成",
     "autoBatch": "自动批量合成",
+    "clearDeduplication": "清除历史去重信息",
     "bgmFolderLabel": "背景音乐文件夹（随机选取.mp3，为空则无背景音）",
     "output": {
       "width": "导出视频宽度",

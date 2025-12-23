@@ -3,7 +3,7 @@
     <video
       ref="Video"
       class="w-full h-full object-cover"
-      :src="'file://' + asset.path"
+      :src="getVideoSrc(asset.path)"
       muted
       loop
       preload="metadata"
@@ -19,6 +19,18 @@ import { ListFilesFromFolderRecord } from '~/electron/types'
 import { ref } from 'vue'
 
 defineProps<{ asset: ListFilesFromFolderRecord }>()
+
+/**
+ * 将文件路径转换为正确编码的 file:// URL
+ * 处理 # 和空格等特殊字符，避免 URL 解析错误
+ */
+const getVideoSrc = (filePath: string) => {
+  // 将反斜杠转为正斜杠，然后对每个路径段进行 URL 编码
+  const normalizedPath = filePath.replace(/\\/g, '/')
+  const parts = normalizedPath.split('/')
+  const encodedParts = parts.map((part) => encodeURIComponent(part))
+  return 'file:///' + encodedParts.join('/')
+}
 
 const emit = defineEmits<{ (e: 'loaded', info: VideoInfo): void }>()
 
